@@ -21,18 +21,15 @@ def main():
     # Large text input
     text = st.text_area("Enter your text below:", height=200)
 
-    # Input for Voice UUID
-    voice_uuid = st.text_input("Voice UUID", "Enter your voice UUID")
-
     # Speed adjustment slider
     speed = st.slider("Playback Speed", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
 
     if st.button("Generate and Play Voice"):
-        if not text or not voice_uuid:
-            st.error("Please fill in all fields.")
+        if not text:
+            st.error("Please fill in the text field.")
         else:
             # Generate voice using Resemble AI API
-            audio_url = generate_voice(voice_uuid, text)
+            audio_url = generate_voice(text)
             if audio_url:
                 st.success("Voice generated successfully!")
 
@@ -56,7 +53,7 @@ def main():
                 st.error("Failed to generate voice. Check your input and try again.")
 
 
-def generate_voice(voice_uuid, text):
+def generate_voice(text):
     """Generate audio from text using Resemble AI"""
     url = BASE_URL
     headers = {
@@ -64,8 +61,8 @@ def generate_voice(voice_uuid, text):
         "Content-Type": "application/json"
     }
     payload = {
-        "voice_uuid": voice_uuid,
-        "text": text
+        "voice_uuid": "562ef613",
+        "data": text
     }
 
     response = requests.post(url, json=payload, headers=headers)
