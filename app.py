@@ -84,19 +84,24 @@ def generate_voice(text):
             "voice_uuid": "562ef613",
             "data": chunk
         }
-        
+
+        # Log payload for debugging
+        st.write(f"Payload for chunk {i + 1}: {payload}")
+
         st.write(f"Sending API request for chunk {i + 1}... ✅")
         response = requests.post(url, json=payload, headers=headers)
 
         if response.status_code == 200:
             st.write(f"Received successful response for chunk {i + 1}. ✅")
             response_data = response.json()
+            st.write(f"Response for chunk {i + 1}: {response_data}")
+
             audio_url = response_data.get("audio_url")
 
             # Validate the audio_url
             if not audio_url or not audio_url.startswith("http"):
-                st.error(f"Invalid audio URL returned: {audio_url}")
-                return None
+                st.error(f"Invalid audio URL returned for chunk {i + 1}: {audio_url}")
+                continue
 
             audio_urls.append(audio_url)
         else:
