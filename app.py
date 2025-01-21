@@ -36,6 +36,12 @@ def main():
 
                 for index, audio_url in enumerate(audio_urls):
                     st.write(f"Fetching audio content from: {audio_url} ✅")
+
+                    # Validate URL before making a request
+                    if not audio_url or not audio_url.startswith("http"):
+                        st.error(f"Invalid audio URL: {audio_url}")
+                        continue
+
                     audio_content = requests.get(audio_url).content
 
                     st.write("Adjusting playback speed for the audio... ✅")
@@ -85,7 +91,14 @@ def generate_voice(text):
         if response.status_code == 200:
             st.write(f"Received successful response for chunk {i + 1}. ✅")
             response_data = response.json()
-            audio_urls.append(response_data.get("audio_url"))
+            audio_url = response_data.get("audio_url")
+
+            # Validate the audio_url
+            if not audio_url or not audio_url.startswith("http"):
+                st.error(f"Invalid audio URL returned: {audio_url}")
+                return None
+
+            audio_urls.append(audio_url)
         else:
             st.error(f"Error: {response.status_code} - {response.text}")
             return None
