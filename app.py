@@ -5,8 +5,8 @@ from pydub import AudioSegment
 
 # ===== CONFIG =====
 API_KEY = "Ew2pEvxMVxWWBQ2DzYzUTgtt"
-BASE_URL = "https://f.cluster.resemble.ai/synthesize"
-VOICE_UUID = "562ef613"  # ปรับตาม voice จริงของคุณ
+BASE_URL = "https://p.cluster.resemble.ai/synthesize"
+VOICE_UUID = "562ef613"
 
 # ===== HELPER =====
 def adjust_audio_speed(audio_content, speed=1.0):
@@ -18,7 +18,7 @@ def adjust_audio_speed(audio_content, speed=1.0):
         return new_audio
     except Exception as e:
         st.error(f"Error adjusting audio speed: {e}")
-        return AudioSegment.silent(duration=1000)  # fallback
+        return AudioSegment.silent(duration=1000)
 
 def generate_voice(text):
     headers = {
@@ -40,10 +40,16 @@ def generate_voice(text):
             try:
                 response = requests.post(BASE_URL, json=payload, headers=headers, timeout=20)
                 response.raise_for_status()
-                audio_url = response.json().get("audio_url")
+                response_data = response.json()
+
+                # Debug JSON output
+                st.write(f"Response for chunk {i + 1}:")
+                st.json(response_data)
+
+                audio_url = response_data.get("audio_url")
 
                 if not audio_url or not audio_url.startswith("http"):
-                    st.error(f"Invalid audio URL for chunk {i + 1}")
+                    st.error(f"Invalid or missing audio URL for chunk {i + 1}")
                     continue
 
                 audio_urls.append(audio_url)
@@ -56,9 +62,9 @@ def generate_voice(text):
 
 # ===== MAIN STREAMLIT APP =====
 def main():
-    st.title("🗣️ Text-to-Speech with Resemble AI")
+    st.title("🗣️ Resemble AI Text-to-Speech (TTS)")
 
-    text = st.text_area("📄 Enter text to convert to speech:", height=200)
+    text = st.text_area("📄 Enter your text:", height=200)
     speed = st.slider("🎚️ Playback Speed", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
 
     if st.button("▶️ Generate and Play"):
@@ -66,12 +72,11 @@ def main():
             st.warning("Please enter some text.")
             return
 
-        st.info("Sending text to Resemble AI...")
+        st.info("🧠 Processing with Resemble AI...")
         audio_urls = generate_voice(text)
 
         if audio_urls:
             st.success("✅ Voice generation completed.")
-
             for index, url in enumerate(audio_urls):
                 try:
                     st.write(f"Fetching audio from: {url}")
@@ -96,7 +101,7 @@ def main():
                 except Exception as e:
                     st.error(f"Failed to play chunk {index + 1}: {e}")
         else:
-            st.error("❌ Voice generation failed. Please try again.")
+            st.error("❌ Voice generation failed. Please check your input or API settings.")
 
 if __name__ == "__main__":
     main()
