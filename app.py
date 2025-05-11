@@ -1,31 +1,42 @@
-from resemble import Resemble
+import streamlit as st
+import requests
 
-# Set your API key
-Resemble.api_key('Ew2pEvxMVxWWBQ2DzYzUTgtt')
+# --- Config ---
+API_KEY = "Ew2pEvxMVxWWBQ2DzYzUTgtt"
+VOICE_UUID = "562ef613"
+SYNTH_ENDPOINT = "https://p.cluster.resemble.ai/synthesize"
 
-# Get default project
-project_uuid = Resemble.v2.projects.all(1, 10)['items'][0]['uuid']
+HEADERS = {
+    "Authorization": f"Bearer {API_KEY}",
+    "Content-Type": "application/json"
+}
 
-# Get default voice
-voice_uuid = Resemble.v2.voices.all(1, 10)['items'][0]['uuid']
+# --- Streamlit UI ---
+st.title("🗣️ Simple TTS with Resemble AI")
+text = st.text_area("พิมพ์ข้อความที่ต้องการให้พูด", height=200)
 
-# Prepare clip text
-body = 'This is a test'
+if st.button("🔊 สร้างเสียง"):
+    if not text.strip():
+        st.warning("กรุณากรอกข้อความก่อน")
+    else:
+        with st.spinner("⏳ กำลังสร้างเสียง..."):
+            payload = {
+                "voice_uuid": VOICE_UUID,
+                "data": text
+            }
+            try:
+                response = requests.post(SYNTH_ENDPOINT, json=payload, headers=HEADERS, timeout=20)
+                response.raise_for_status()
+                result = response.json()
+                audio_url = result.get("audio_url")
 
-# Create the voice clip synchronously
-response = Resemble.v2.clips.create_sync(
-    project_uuid,
-    voice_uuid,
-    body
-)
+                if audio_url:
+                    st.success("✅ ได้ลิงก์เสียงแล้ว")
+                    st.audio(audio_url, format="audio/mp3")
+                    st.markdown(f"[🔗 เปิดลิงก์เสียงในแท็บใหม่]({audio_url})")
+                else:
+                    st.error("❌ ไม่พบลิงก์เสียงในคำตอบ")
+                    st.json(result)
 
-# Output response
-print("API Response:")
-print(response)
-
-# Check audio URL
-audio_url = response.get('audio_src')
-if audio_url:
-    print("✅ Audio URL:", audio_url)
-else:
-    print("❌ No audio_src returned.")
+            except Exception as e:
+                st.error(f"เกิดข้อผิดพลาด: {e}")
