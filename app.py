@@ -1,14 +1,14 @@
 import streamlit as st
+from resemble import Resemble
 import requests
 from io import BytesIO
 from pydub import AudioSegment
 
-# ===== CONFIG =====
+# === Setup ===
 API_KEY = "Ew2pEvxMVxWWBQ2DzYzUTgtt"
-BASE_URL = "https://p.cluster.resemble.ai/synthesize"
-VOICE_UUID = "562ef613"
+Resemble.api_key(API_KEY)
 
-# ===== HELPER =====
+# === Audio Speed Adjustment ===
 def adjust_audio_speed(audio_content, speed=1.0):
     try:
         audio = AudioSegment.from_file(BytesIO(audio_content), format="mp3")
@@ -20,88 +20,61 @@ def adjust_audio_speed(audio_content, speed=1.0):
         st.error(f"Error adjusting audio speed: {e}")
         return AudioSegment.silent(duration=1000)
 
-def generate_voice(text):
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
+# === Voice + Project Setup ===
+def get_default_project_and_voice():
+    project_uuid = Resemble.v2.projects.all(1, 10)['items'][0]['uuid']
+    voice_uuid = Resemble.v2.voices.all(1, 10)['items'][0]['uuid']
+    return project_uuid, voice_uuid
 
-    max_chunk_size = 500
-    chunks = [text[i:i + max_chunk_size] for i in range(0, len(text), max_chunk_size)]
-    audio_urls = []
+# === Generate Voice ===
+def generate_voice(text, project_uuid, voice_uuid):
+    try:
+        response = Resemble.v2.clips.create_sync(
+            project_uuid,
+            voice_uuid,
+            text
+        )
+        audio_url = response.get('audio_src')
+        if not audio_url:
+            st.error("No audio URL returned.")
+            return None
+        return audio_url
+    except Exception as e:
+        st.error(f"Error generating voice: {e}")
+        return None
 
-    for i, chunk in enumerate(chunks):
-        with st.spinner(f"🔊 Generating voice for chunk {i + 1}/{len(chunks)}..."):
-            payload = {
-                "voice_uuid": VOICE_UUID,
-                "data": chunk
-            }
-
-            try:
-                response = requests.post(BASE_URL, json=payload, headers=headers, timeout=20)
-                response.raise_for_status()
-                response_data = response.json()
-
-                # Debug JSON output
-                st.write(f"Response for chunk {i + 1}:")
-                st.json(response_data)
-
-                audio_url = response_data.get("audio_url")
-
-                if not audio_url or not audio_url.startswith("http"):
-                    st.error(f"Invalid or missing audio URL for chunk {i + 1}")
-                    continue
-
-                audio_urls.append(audio_url)
-
-            except requests.exceptions.RequestException as e:
-                st.error(f"Chunk {i + 1} failed: {e}")
-                return None
-
-    return audio_urls
-
-# ===== MAIN STREAMLIT APP =====
+# === Streamlit App ===
 def main():
-    st.title("🗣️ Resemble AI Text-to-Speech (TTS)")
+    st.title("🎙️ Resemble AI TTS via Official SDK")
 
-    text = st.text_area("📄 Enter your text:", height=200)
-    speed = st.slider("🎚️ Playback Speed", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
+    text = st.text_area("💬 Enter your text:", height=200)
+    speed = st.slider("⏩ Playback Speed", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
 
-    if st.button("▶️ Generate and Play"):
+    if st.button("🗣️ Generate Voice"):
         if not text.strip():
             st.warning("Please enter some text.")
             return
 
-        st.info("🧠 Processing with Resemble AI...")
-        audio_urls = generate_voice(text)
+        with st.spinner("🔄 Getting project and voice info..."):
+            project_uuid, voice_uuid = get_default_project_and_voice()
 
-        if audio_urls:
-            st.success("✅ Voice generation completed.")
-            for index, url in enumerate(audio_urls):
-                try:
-                    st.write(f"Fetching audio from: {url}")
-                    audio_response = requests.get(url, timeout=15)
+        with st.spinner("🧠 Generating voice..."):
+            audio_url = generate_voice(text, project_uuid, voice_uuid)
 
-                    if audio_response.status_code != 200:
-                        st.error(f"Error fetching audio chunk {index + 1}")
-                        continue
+        if audio_url:
+            st.success("✅ Voice generated successfully.")
+            st.write("🎧 Fetching audio from:")
+            st.code(audio_url)
 
-                    adjusted_audio = BytesIO()
-                    adjust_audio_speed(audio_response.content, speed).export(adjusted_audio, format="mp3")
-                    adjusted_audio.seek(0)
+            audio_response = requests.get(audio_url)
+            adjusted_audio = BytesIO()
+            adjust_audio_speed(audio_response.content, speed).export(adjusted_audio, format="mp3")
+            adjusted_audio.seek(0)
 
-                    st.audio(adjusted_audio, format="audio/mp3")
-
-                    st.download_button(
-                        label=f"⬇️ Download Audio {index + 1}",
-                        data=adjusted_audio,
-                        file_name=f"voice_{index + 1}.mp3",
-                        mime="audio/mp3"
-                    )
-                except Exception as e:
-                    st.error(f"Failed to play chunk {index + 1}: {e}")
+            st.audio(adjusted_audio, format="audio/mp3")
+            st.download_button("⬇️ Download", adjusted_audio, file_name="resemble_voice.mp3", mime="audio/mp3")
         else:
-            st.error("❌ Voice generation failed. Please check your input or API settings.")
+            st.error("❌ Failed to generate voice.")
 
 if __name__ == "__main__":
     main()
